@@ -57,7 +57,7 @@ def spiral(md):
     return spiral
 
 def boxy_spiral(md,w,h):
-    return nd.interpolation.zoom(spiral(md),(w,h),order=0)
+    return nd.interpolation.zoom(spiral(md),(w/md,h/md),order=0)
 
 def test_spiral():
     test_spiral_gen()

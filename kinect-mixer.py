@@ -10,7 +10,6 @@ import time
 import logging
 import scipy.ndimage.morphology
 import argparse
-import timeout_decorator
 import spiral
 
 logging.basicConfig(stream = sys.stderr, level=logging.INFO)
@@ -18,13 +17,14 @@ logging.basicConfig(stream = sys.stderr, level=logging.INFO)
 # 2. bounding box calculation
 
 parser = argparse.ArgumentParser(description='Track Motion!')
-parser.add_argument('-osc', dest='osc', default=7770,help="OSC Port")
-parser.set_defaults(motion=False,osc=7770)
+parser.add_argument('-osc', dest='osc', default=57120,help="OSC Port")
+parser.set_defaults(motion=False,osc=57120)
 args = parser.parse_args()
 
 target = liblo.Address(args.osc)
 def send_osc(path,*args):
     global target
+    print (path,args)
     return liblo.send(target, path, *args)
 
 
@@ -205,13 +205,44 @@ def get_mask(n=15):
     mask = (summap == n) | (summap < (n*1/20)) * 1
     return (mask, summap)
 
-context.mask, summap = get_mask(15)
+mask, summap = get_mask(15)
 
 
 
 my_timeout = 60.0
 
+myspiral = np.transpose(spiral.boxy_spiral(8, WIDTH, HEIGHT))
+print myspiral.shape
+print myspiral
+cv2.imshow("spiral",255-myspiral.astype(np.uint8)*16 )
 
+threshold = 112
+def reduce_threshold():
+    global threshold
+    threshold = max(0,threshold - 10)
+    print threshold
+
+def increase_threshold():
+    global threshold
+    threshold = min(1024,threshold + 10)
+    print threshold
+
+def noteon(note):
+    """nothing"""
+    send_osc("/noteon",int(note))
+
+def noteoff(note):
+    """nothing"""
+    send_osc("/noteoff",int(note))
+
+    
+handlers[ord('t')] = reduce_threshold
+handlers[ord('y')] = increase_threshold
+handlers[ord('T')] = increase_threshold
+
+image = np.zeros((HEIGHT,WIDTH,3), np.uint8)
+image[:,:,0] = 255-myspiral.astype(np.uint8)*16
+laston = set()
 while(1):
     depth_map = get_depth_map()
     if depth_map == None:
@@ -219,13 +250,34 @@ while(1):
         continue
     
     # now communicate the centroid if there is motion
-    
-    depth_map_bmp = depth_map_to_bmp(depth_map)
-    depth_map_bmp = cv2.flip(depth_map_bmp, 1)
-    cv2.imshow(screen_name,(255/8) * (depth_map_bmp % 8))
-    # cv2.imshow("%s - diff" % screen_name,depth_map_to_bmp(context.diff))# * context.diff))
-    cv2.imshow("%s - diff" % screen_name,(context.diff == 0)*255.0)# * context.diff))
+    depth_map_bmp = depth_map_to_bmp(depth_map) 
+    depth_map_bmp = cv2.flip(depth_map_bmp, 1) 
+    cv2.imshow(screen_name,(256/32) * ((depth_map_bmp ) % 32)*(4*(65-myspiral)))
 
+    # cv2.imshow("%s - diff" % screen_name,depth_map_to_bmp(context.diff))# * context.diff))
+    # cv2.imshow("%s - diff" % screen_name,(context.diff == 0)*255.0)# * context.diff))
+
+    bitmask = (depth_map < threshold)
+    # image[:,:,2] = 128 * bitmask  * (3*(64-myspiral))
+    image[:,:,2] = 255*bitmask
+
+    uniques = set(np.unique(bitmask * myspiral))
+    for x in uniques:
+        if x in laston:
+            """ do nothing """
+        else:
+            noteon(x)
+    for x in laston:
+        if x in uniques:
+            """ do nothing """
+        else:
+            noteoff(x)
+
+    laston = uniques
+    
+    cv2.imshow("thresholds", image)
+
+    
     if handle_keys():
         break
 
