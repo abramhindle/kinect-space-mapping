@@ -11,6 +11,7 @@ import logging
 import scipy.ndimage.morphology
 import argparse
 import timeout_decorator
+import spiral
 
 logging.basicConfig(stream = sys.stderr, level=logging.INFO)
 # 1. get kinect input
@@ -65,34 +66,6 @@ Scale_Factor = 0.0021
 dmfloor,dmwall = np.meshgrid(np.arange(0,HEIGHT),np.arange(0,WIDTH),indexing='ij')
 dmfloor = 1024 - 1024 * dmfloor / 480
 
-def spiral(w,h):
-    md = max(w,h)
-    spiral = np.zeros((md,md),dtype=np.int32)
-    # spiral = np.zeros((w,h),dtype=np.int32)
-    sx = w/2 - 1
-    sy = h/2 - 1
-    cnt = 1
-    spiral[sx,sy] = cnt
-    maxcnt = md*md
-    offset = 1
-    llen = 2
-    # directions of the spiral
-    dirs = [(0,1),(-1,0),(0,-1),(1,0)]
-    # start to the right
-    sx += 1
-    while(cnt < maxcnt):
-        for dire in dirs:            
-            for i in xrange(0,llen):
-                sx += dire[0]
-                sy += dire[1]
-                print (sx,sy,cnt,llen,dire)
-                spiral[sx,sy] = cnt
-                cnt += 1
-        sx +=1 # to the right
-        llen += 2
-    return spiral
-
-spiral(4,4)
 
 """
 	Conversion from http://openkinect.org/wiki/Imaging_Information
